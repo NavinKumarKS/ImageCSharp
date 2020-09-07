@@ -1,0 +1,145 @@
+﻿
+            #region noise removal
+
+            int n = 3;
+            for (int x = 0; x < width; x += 3)
+                for (int y = 0; y < height; y++)
+                {
+                    int sum = 0;
+                    for (int dy = -(n / 2), i = 0; dy <= n / 2; dy++, i++)
+                        for (int dx = -(n / 2), j = 0; dx <= n / 2; dx++, j++)
+                        {
+                            sum = result_x[x, y] * Gaussian3[i, j] / 16;
+                        }
+                    result_x[x, y] = sum / 16;
+                }
+
+            #endregion
+
+           
+
+
+            G[,] _g = new G[10000, 10000];
+            #region edge detection
+
+            double pi = 3.1415926;
+            for (int x = 0; x < width; x += 3)
+                for (int y = 0; y < height; y++)
+                {
+                    double gx = 0, gy = 0;
+                    for (int dx = -1, i = 0; dx <= 1; dx++, i++)
+                        for (int dy = -1, j = 0; dy <= 1; dy++, j++)
+                        {
+                            var _dy = y + dy;
+                            var _dx = x / 3 + dx;
+                            gx += result_x[_dy < 0 ? 0 : _dy, _dx < 0 ? 0 : _dx] * sobel_dx[i, j];
+                            gy += result_x[_dy < 0 ? 0 : _dy, _dx < 0 ? 0 : _dx] * sobel_dy[i, j];
+                        }
+
+                    int avg = (int)Math.Sqrt(gx * gx + gy * gy);
+                    avg = avg > 255 ? 255 : avg;
+                    original.SetPixel(x, y, Color.FromArgb(avg, avg, avg));
+                    result_x[x, y] = avg;
+
+                    int theta = (int)(Math.Atan(gy / gx) * 180 / pi);
+                    theta = theta % 180;
+
+                    if (theta <= 22.5 || theta > 157.5) _g[y, x / 3] = new G(avg, 0);   //0 degree
+                    else if (theta <= 67.5) _g[y, x / 3] = new G(avg, 1);   //45 degree
+                    else if (theta <= 112.5) _g[y, x / 3] = new G(avg, 2);   //90 degree
+                    else if (theta <= 157.5) _g[y, x / 3] = new G(avg, 3); 	//135 degree	
+                }
+
+
+            #endregion
+
+
+            #region non-maximal supression
+
+            var _res = _g[10, 10 / 3];
+
+            //for (int y = 0; y < original.Height; y++)
+            //    for (int x = 0; x < original.Width; x += 3)
+            //    {
+            //        //if it's not the maximal between the positive and negative pixels 
+            //        //goal: keep the maximal pixels
+            //        switch (g[y,x / 3])
+            //        {
+            //            case 0: //0 degree
+            //                if (g[y][x / 3].magnitude < g[y][x / 3 - 1].magnitude || g[y][x / 3].magnitude < g[y][x / 3 + 1].magnitude)
+            //                    g[y][x / 3].magnitude = 0;
+            //                break;
+            //            case 1: //45 degree
+            //                if (g[y][x / 3].magnitude < g[y - 1][x / 3 - 1].magnitude || g[y][x / 3].magnitude < g[y + 1][x / 3 + 1].magnitude)
+            //                    g[y][x / 3].magnitude = 0;
+            //                break;
+            //            case 2: //90 degree
+            //                if (g[y][x / 3].magnitude < g[y - 1][x / 3].magnitude || g[y][x / 3].magnitude < g[y + 1][x / 3].magnitude)
+            //                    g[y][x / 3].magnitude = 0;
+            //                break;
+            //            case 3: //135 degree
+            //                if (g[y][x / 3].magnitude < g[y - 1][x / 3 + 1].magnitude || g[y][x / 3].magnitude < g[y + 1][x / 3 - 1].magnitude)
+            //                    g[y][x / 3].magnitude = 0;
+            //                break;
+            //        }
+            //        input.term[y * input.rowsize + x] = input.term[y * input.rowsize + x + 1] = input.term[y * input.rowsize + x + 2]
+            //        = g[y][x / 3].magnitude;
+
+            //        var p = original.GetPixel(y, x);
+            //        int a = p.A;
+            //        int avg = (int)g[y][x / 3];
+            //        original.SetPixel(y, x, Color.FromArgb(a, avg, avg, avg));
+            //    }
+            #endregion
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            public unsafe static void GetImage(Bitmap processedBitmap)
+        {
+            unsafe
+            {
+                BitmapData bitmapData = processedBitmap.LockBits(new Rectangle(0, 0, processedBitmap.Width, processedBitmap.Height), ImageLockMode.ReadWrite, processedBitmap.PixelFormat);
+                int bytesPerPixel = System.Drawing.Bitmap.GetPixelFormatSize(processedBitmap.PixelFormat) / 8;
+                int heightInPixels = bitmapData.Height;
+                int widthInBytes = bitmapData.Width * bytesPerPixel;
+                byte* ptrFirstPixel = (byte*)bitmapData.Scan0;
+
+                for (int y = 0; y < heightInPixels; y++)
+                {
+                    byte* currentLine = ptrFirstPixel + (y * bitmapData.Stride);
+                    for (int x = 0; x < widthInBytes; x = x + bytesPerPixel)
+                    {
+                        int oldBlue = currentLine[x];
+                        int oldGreen = currentLine[x + 1];
+                        int oldRed = currentLine[x + 2];
+
+                        // calculate new pixel value
+                        currentLine[x] = (byte)oldBlue;
+                        currentLine[x + 1] = (byte)oldGreen;
+                        currentLine[x + 2] = (byte)oldRed;
+                    }
+                }
+                processedBitmap.UnlockBits(bitmapData);
+            }
+        }
